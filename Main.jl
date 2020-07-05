@@ -125,6 +125,7 @@ function _Main(
         
         for (i, T) in enumerate(TS)
             Status = RawStatus  # 赋初值
+            Ratios = Dict()
 
             # 时间序列循环
             for time = 1:timeScale
@@ -133,7 +134,12 @@ function _Main(
                     xIndex, yIndex = rand(1:n, 2)   # 生成此次的参考位置
 
                     ΔE = _ΔE(Status, xIndex, yIndex)    # 计算参考位置发生反转时引起的能量变化
-                    ratio = exp(-ΔE/T)  # 计算可行概率
+                    if ismissing(getkey(Ratios, ΔE, missing))
+                        ratio = exp(-ΔE/T)  # 计算可行概率
+                        Ratios[ΔE] = ratio
+                    else
+                        ratio = Ratios[ΔE]
+                    end
 
                     # 若可行则更新状态
                     (rand() < ratio) && (Status[xIndex, yIndex] *= -1; true)

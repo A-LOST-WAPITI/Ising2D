@@ -1,0 +1,4 @@
+name = "Ising2D"
+uuid = "7d841ca7-679b-4ae7-840e-ec80d82905ca"
+authors = ["a-lost-wapiti <a_lost_wapiti@outlook.com>"]
+version = "0.1.0"

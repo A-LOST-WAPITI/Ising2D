@@ -7,6 +7,21 @@ const J₁ = 1    # x方向相邻的相互作用
 const J₂ = 1    # y方向相邻的相互作用
 
 
+function _Nei(xIndex::Int64, yIndex::Int64, n::Int64)
+    # 对于临近索引赋初值，保证正常遍历过程不会得到
+    XNei = fill(n + 1, 2)
+    YNei = fill(n + 1, 2)
+
+    # 处理近邻格点位置
+    xIndex == 1 && (XNei[1] = n; true) || (XNei[1] = xIndex - 1; true)
+    xIndex == n && (XNei[2] = 1; true) || (XNei[2] = xIndex + 1; true)
+    yIndex == 1 && (YNei[1] = n; true) || (YNei[1] = yIndex - 1; true)
+    yIndex == n && (YNei[2] = 1; true) || (YNei[2] = yIndex + 1; true)
+
+    return XNei, YNei
+end
+
+
 @doc md"""
     _ΔE(Status::Array{Int64}, xIndex::Int64, yIndex::Int64)
 
@@ -17,22 +32,14 @@ function _ΔE(Status::Array{Int64}, xIndex::Int64, yIndex::Int64)
     n = size(Status)[1]
     state = Status[xIndex, yIndex]  # 所选点的状态
 
-    # 对于临近索引赋初值，保证正常遍历过程不会得到
-    xNei = fill(n + 1, 2)
-    yNei = fill(n + 1, 2)
-
-    # 处理近邻格点位置
-    xIndex == 1 && (xNei[1] = n; true) || (xNei[1] = xIndex - 1; true)
-    xIndex == n && (xNei[2] = 1; true) || (xNei[2] = xIndex + 1; true)
-    yIndex == 1 && (yNei[1] = n; true) || (yNei[1] = yIndex - 1; true)
-    yIndex == n && (yNei[2] = 1; true) || (yNei[2] = yIndex + 1; true)
+    XNei, YNei = _Nei(xIndex, yIndex, n)
 
     # 计算原能量
     rawE = 0.0
-    for i in xNei
+    for i in XNei
         rawE += J₁ * state * Status[i, yIndex]
     end
-    for j in yNei
+    for j in YNei
         rawE += J₂ * state * Status[xIndex, j]
     end
 
@@ -127,23 +134,62 @@ function _Main(
             σASTemp = Array{Float64}([])
             Acorr = Array{Float64}([])
             σA::Float64 = 0
+            coin = 1 - exp(-(J₁ + J₂)/T)
 
             # 时间序列循环
             for time = 1:timeScale
-                # 随机遍历格点
-                for count = 1:n^2
-                    xIndex, yIndex = rand(1:n, 2)   # 生成此次的参考位置
+                StatusCheck = falses(n, n)
+                Indices = Array{CartesianIndex}(
+                    [CartesianIndex(rand(1:n), rand(1:n))]
+                )
+                
 
-                    ΔE = _ΔE(Status, xIndex, yIndex)    # 计算参考位置发生反转时引起的能量变化
-                    if ismissing(getkey(Ratios, ΔE, missing))
-                        ratio = exp(-ΔE/T)  # 计算可行概率
-                        Ratios[ΔE] = ratio
-                    else
-                        ratio = Ratios[ΔE]
+                while sum(StatusCheck) != n^2
+                    Cluster = Array{CartesianIndex}([])
+
+                    while lastindex(Indices) > 0
+                        index = popfirst!(Indices)
+                        state = Status[index]
+                        StatusCheck[index] = true
+                        push!(Cluster, index)
+
+                        xIndex = index[1]
+                        yIndex = index[2]
+
+                        XNei, YNei = _Nei(xIndex, yIndex, n)
+
+                        for i in XNei
+                            indexTemp = CartesianIndex(i, yIndex)
+                            if Status[indexTemp] == state && !StatusCheck[indexTemp]
+                                if rand() < coin
+                                    push!(Indices, indexTemp)
+                                    StatusCheck[indexTemp] = true
+                                    push!(Cluster, indexTemp)
+                                end
+                            end
+                        end
+                        for j in YNei
+                            indexTemp = CartesianIndex(xIndex, j)
+                            if Status[indexTemp] == state && !StatusCheck[indexTemp]
+                                if rand() < coin
+                                    push!(Indices, indexTemp)
+                                    StatusCheck[indexTemp] = true
+                                    push!(Cluster, indexTemp)
+                                end
+                            end
+                        end
                     end
 
-                    # 若可行则更新状态
-                    (rand() < ratio) && (Status[xIndex, yIndex] *= -1; true)
+                    if rand() < 0.5
+                        for index in Cluster
+                            Status[index] *= -1
+                        end
+                    end
+
+                    index = findfirst((x -> !x), StatusCheck)
+                    if !isnothing(index)
+                        push!(Indices, index)
+                    end
                 end
 
                 σA = sum(Status)/n^2 |> abs # 求平均后绝对值

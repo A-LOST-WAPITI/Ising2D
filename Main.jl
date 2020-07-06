@@ -23,32 +23,6 @@ end
 
 
 @doc md"""
-    _ΔE(Status::Array{Int64}, xIndex::Int64, yIndex::Int64)
-
-    用于计算给定所有点状态`Status`时，
-    位于(`xIndex`,`yIndex`)的点发生反转时所引起的能量变化
-""" ->
-function _ΔE(Status::Array{Int64}, xIndex::Int64, yIndex::Int64)
-    n = size(Status)[1]
-    state = Status[xIndex, yIndex]  # 所选点的状态
-
-    XNei, YNei = _Nei(xIndex, yIndex, n)
-
-    # 计算原能量
-    rawE = 0.0
-    for i in XNei
-        rawE += J₁ * state * Status[i, yIndex]
-    end
-    for j in YNei
-        rawE += J₂ * state * Status[xIndex, j]
-    end
-
-    # 反转带来的能量差
-    ΔE = 2rawE
-end
-
-
-@doc md"""
     _TheoryF(T::Float64, σ::Float64)
 
     用于确定温度为`T`时平均自旋`σ`的平均场近似理论解

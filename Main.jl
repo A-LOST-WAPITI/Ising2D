@@ -100,15 +100,13 @@ end
 
     主函数，
     其中`nPowMax`用于迭代产生单方向节点个数，
-    `timeScale`用于确定最大的迭代时间，
-    `TMax`是最大的温度，
-    `repeatTimes`是用于提升稳定性的重复实验次数
+    `timeScale`用于确定最大的迭代步数，
+    `TMax`是最大的温度
 """ ->
 function _Main(
     nPowMax::Int64 = 6, 
     timeScale::Int64 = 1000, 
-    TMax::Int64 = 5, 
-    repeatTimes::Int64 = 2
+    TMax::Int64 = 5
 )
     TS = collect(0.05:0.05:TMax)    # 温度序列
     σAS = similar(TS)  # 存储温度序列对应平均自旋的数组
@@ -126,6 +124,9 @@ function _Main(
         for (i, T) in enumerate(TS)
             Status = RawStatus  # 赋初值
             Ratios = Dict()
+            σSTemp = Array{Float64}([])
+            Acorr = Array{Float64}([])
+            σ::Float64 = 0
 
             # 时间序列循环
             for time = 1:timeScale
@@ -144,11 +145,21 @@ function _Main(
                     # 若可行则更新状态
                     (rand() < ratio) && (Status[xIndex, yIndex] *= -1; true)
                 end
+
+                σ = sum(Status)/n^2 |> abs # 求平均后绝对值
+                pushfirst!(σSTemp, σ)
+                push!(Acorr, 0)
+                for j in eachindex(σSTemp)
+                    Acorr[j] += σ * σSTemp[j]
+                end
+                
+                if last(Acorr) == 0
+                    break
+                end
             end
 
-            σA = sum(Status)/n^2 |> abs # 求平均后绝对值
-            println("Temperature\t", T, "\tσAverage\t", σA)
-            σAS[i] = σA    # 存储遍历数据
+            println("Temperature\t", T, "\tσAverage\t", σ)
+            σAS[i] = σ    # 存储遍历数据
         end
 
         # 绘制不同实验的图像

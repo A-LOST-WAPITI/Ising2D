@@ -124,9 +124,9 @@ function _Main(
         for (i, T) in enumerate(TS)
             Status = RawStatus  # 赋初值
             Ratios = Dict()
-            σSTemp = Array{Float64}([])
+            σASTemp = Array{Float64}([])
             Acorr = Array{Float64}([])
-            σ::Float64 = 0
+            σA::Float64 = 0
 
             # 时间序列循环
             for time = 1:timeScale
@@ -146,11 +146,11 @@ function _Main(
                     (rand() < ratio) && (Status[xIndex, yIndex] *= -1; true)
                 end
 
-                σ = sum(Status)/n^2 |> abs # 求平均后绝对值
-                pushfirst!(σSTemp, σ)
+                σA = sum(Status)/n^2 |> abs # 求平均后绝对值
+                pushfirst!(σASTemp, σA)
                 push!(Acorr, 0)
-                for j in eachindex(σSTemp)
-                    Acorr[j] += σ * σSTemp[j]
+                for j in eachindex(σASTemp)
+                    Acorr[j] += σA * σASTemp[j]
                 end
                 
                 if last(Acorr) == 0
@@ -158,8 +158,8 @@ function _Main(
                 end
             end
 
-            println("Temperature\t", T, "\tσAverage\t", σ)
-            σAS[i] = σ    # 存储遍历数据
+            println("Temperature\t", T, "\tσAverage\t", σA)
+            σAS[i] = σA    # 存储遍历数据
         end
 
         # 绘制不同实验的图像

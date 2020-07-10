@@ -74,7 +74,7 @@ end
 
 @doc md"""
     _Main(
-        nPowMax::Int64 = 6, 
+        nPowMax::Int64 = 5, 
         timeScale::Int64 = 1000, 
         TMax::Int64 = 5
     )
@@ -85,11 +85,13 @@ end
     `TMax`是最大的温度
 """ ->
 function _Main(
-    nPowMax::Int64 = 6, 
-    timeScale::Int64 = 1000, 
-    TMax::Int64 = 5
+    nPowMax::Int64 = 5, 
+    timeScale::Int64 = 2000, 
+    TMin::Int64 = 1,
+    TMax::Int64 = 4,
+    TTick::Float64 = 0.1
 )
-    TS = collect(0.05:0.05:TMax)    # 温度序列
+    TS = collect(TMin:TTick:TMax)    # 温度序列
     σAS = similar(TS)  # 存储温度序列对应平均自旋的数组
 
     plot(size = (1200, 800))
@@ -102,9 +104,9 @@ function _Main(
         println("\nThe number of nodes is $(n)")
         println("*"^5)
         
+        # 对于给定的单方向格点数遍历各个不同的温度
         for (i, T) in enumerate(TS)
             Status = RawStatus  # 赋初值
-            Ratios = Dict()
             σASTemp = Array{Float64}([])
             Acorr = Array{Float64}([])
             σA::Float64 = 0
@@ -116,10 +118,10 @@ function _Main(
                 Indices = Array{CartesianIndex}(
                     [CartesianIndex(rand(1:n), rand(1:n))]
                 )
-                
 
+                # 如果仍有格点未被检验则进行cluster
                 while sum(StatusCheck) != n^2
-                    Cluster = Array{CartesianIndex}([])
+                    Cluster = Array{CartesianIndex}([]) # 用于存储本次生成的cluster的格点位置的数组
 
                     while lastindex(Indices) > 0
                         index = popfirst!(Indices)
@@ -134,7 +136,7 @@ function _Main(
 
                         for i in XNei
                             indexTemp = CartesianIndex(i, yIndex)
-                            if Status[indexTemp] == state && !StatusCheck[indexTemp]
+                            if !StatusCheck[indexTemp] && Status[indexTemp] == state
                                 if rand() < coin
                                     push!(Indices, indexTemp)
                                     StatusCheck[indexTemp] = true
@@ -144,7 +146,7 @@ function _Main(
                         end
                         for j in YNei
                             indexTemp = CartesianIndex(xIndex, j)
-                            if Status[indexTemp] == state && !StatusCheck[indexTemp]
+                            if !StatusCheck[indexTemp] && Status[indexTemp] == state
                                 if rand() < coin
                                     push!(Indices, indexTemp)
                                     StatusCheck[indexTemp] = true
@@ -160,9 +162,9 @@ function _Main(
                         end
                     end
 
-                    index = findfirst((x -> !x), StatusCheck)
-                    if !isnothing(index)
-                        push!(Indices, index)
+                    nextIndex = findfirst(!, StatusCheck)
+                    if !isnothing(nextIndex)
+                        push!(Indices, nextIndex)
                     end
                 end
 
@@ -173,7 +175,7 @@ function _Main(
                     Acorr[j] += σA * σASTemp[j]
                 end
                 
-                if last(Acorr) == 0
+                if last(Acorr) |> iszero
                     break
                 end
             end
@@ -189,19 +191,13 @@ function _Main(
             label = "$(n)-nodes"
         )
     end
-    xlabel!("kT/J") # x轴名称
-    ylabel!("⟨σ⟩")  # y轴名称
+    xlabel!("kT/J")     # x轴名称
+    xticks!(TS)         # x轴刻度  
+    ylabel!("⟨σ⟩")       # y轴名称
     title!("σAverage-nodes")  # 图名
     savefig("sigmaAverage-nodes.png")
 
-    solutionIndex = findfirst((x -> x < 0.1), σAS) # 找到第一个平均自旋降至最大值的0.1的温度
-    #=
-    TODO:
-    这里通过图形来看确实在2-3之间便已经出现了相变，但0.1是否过大？
-    在2-3之间仍有较大波动，
-    如果将解的条件限制到0.01则会到达4左右与理论值差距减小，
-    但又与整个图像的走势不同。
-    =#
+    solutionIndex = findfirst(iszero, σAS) # 找到第一个平均自旋降至0的温度
     println("\n", "*"^10)
     println("Solution is:\t", TS[solutionIndex])    # 将解打印
     println()
@@ -223,8 +219,9 @@ function _Main(
         σAST,
         label = "theoretical"
     )
-    xlabel!("kT/J") # x轴名称
-    ylabel!("⟨σ⟩")  # y轴名称
+    xlabel!("kT/J")     # x轴名称
+    xticks!(TS)         # x轴刻度  
+    ylabel!("⟨σ⟩")       # y轴名称
     title!("σAverage")  # 图名
     savefig("sigmaAverage.png")
 

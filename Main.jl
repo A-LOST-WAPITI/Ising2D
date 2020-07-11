@@ -86,7 +86,7 @@ end
 """ ->
 function _Main(
     nPowMax::Int64 = 5, 
-    timeScale::Int64 = 2000, 
+    timeScale::Int64 = 1000, 
     TMin::Int64 = 1,
     TMax::Int64 = 4,
     TTick::Float64 = 0.1

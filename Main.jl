@@ -110,62 +110,50 @@ function _Main(
             σASTemp = Array{Float64}([])
             Acorr = Array{Float64}([])
             σA::Float64 = 0
-            coin = 1 - exp(-(J₁ + J₂)/T)
+            pCluster = 1 - exp(-(J₁ + J₂)/T)
 
             # 时间序列循环
             for time = 1:timeScale
                 StatusCheck = falses(n, n)
+                Cluster = Array{CartesianIndex}([]) # 用于存储本次生成的cluster的格点位置的数组
                 Indices = Array{CartesianIndex}(
                     [CartesianIndex(rand(1:n), rand(1:n))]
                 )
 
-                # 如果仍有格点未被检验则进行cluster
-                while sum(StatusCheck) != n^2
-                    Cluster = Array{CartesianIndex}([]) # 用于存储本次生成的cluster的格点位置的数组
+                while lastindex(Indices) > 0
+                    index = popfirst!(Indices)
+                    state = Status[index]
+                    StatusCheck[index] = true
+                    push!(Cluster, index)
 
-                    while lastindex(Indices) > 0
-                        index = popfirst!(Indices)
-                        state = Status[index]
-                        StatusCheck[index] = true
-                        push!(Cluster, index)
+                    xIndex = index[1]
+                    yIndex = index[2]
+                    XNei, YNei = _Nei(xIndex, yIndex, n)
 
-                        xIndex = index[1]
-                        yIndex = index[2]
-
-                        XNei, YNei = _Nei(xIndex, yIndex, n)
-
-                        for i in XNei
-                            indexTemp = CartesianIndex(i, yIndex)
-                            if !StatusCheck[indexTemp] && Status[indexTemp] == state
-                                if rand() < coin
-                                    push!(Indices, indexTemp)
-                                    StatusCheck[indexTemp] = true
-                                    push!(Cluster, indexTemp)
-                                end
-                            end
-                        end
-                        for j in YNei
-                            indexTemp = CartesianIndex(xIndex, j)
-                            if !StatusCheck[indexTemp] && Status[indexTemp] == state
-                                if rand() < coin
-                                    push!(Indices, indexTemp)
-                                    StatusCheck[indexTemp] = true
-                                    push!(Cluster, indexTemp)
-                                end
+                    for i in XNei
+                        indexTemp = CartesianIndex(i, yIndex)
+                        if !StatusCheck[indexTemp] && Status[indexTemp] == state
+                            if rand() < pCluster
+                                push!(Indices, indexTemp)
+                                StatusCheck[indexTemp] = true
+                                push!(Cluster, indexTemp)
                             end
                         end
                     end
-
-                    if rand() < 0.5
-                        for index in Cluster
-                            Status[index] *= -1
+                    for j in YNei
+                        indexTemp = CartesianIndex(xIndex, j)
+                        if !StatusCheck[indexTemp] && Status[indexTemp] == state
+                            if rand() < pCluster
+                                push!(Indices, indexTemp)
+                                StatusCheck[indexTemp] = true
+                                push!(Cluster, indexTemp)
+                            end
                         end
                     end
+                end
 
-                    nextIndex = findfirst(!, StatusCheck)
-                    if !isnothing(nextIndex)
-                        push!(Indices, nextIndex)
-                    end
+                for index in Cluster
+                    Status[index] *= -1
                 end
 
                 σA = sum(Status)/n^2 |> abs # 求平均后绝对值

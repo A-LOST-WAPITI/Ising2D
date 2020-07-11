@@ -102,9 +102,10 @@ function _Main(
         # 生成每次实验在不同温度下通用的初始状态
         RawStatus::Array{Int64} = rand((-1, 1), (n, n))
         println("\nThe number of nodes is $(n)")
-        println("*"^5)
+        println("*"^20)
         
         # 对于给定的单方向格点数遍历各个不同的温度
+        LengthCluster = Array{Int64}([])
         for (i, T) in enumerate(TS)
             Status = RawStatus  # 赋初值
             σASTemp = Array{Float64}([])
@@ -116,12 +117,12 @@ function _Main(
             for time = 1:timeScale
                 StatusCheck = falses(n, n)
                 Cluster = Array{CartesianIndex}([]) # 用于存储本次生成的cluster的格点位置的数组
-                Indices = Array{CartesianIndex}(
+                CenterIndices = Array{CartesianIndex}(
                     [CartesianIndex(rand(1:n), rand(1:n))]
                 )
 
-                while lastindex(Indices) > 0
-                    index = popfirst!(Indices)
+                while lastindex(CenterIndices) > 0
+                    index = popfirst!(CenterIndices)
                     state = Status[index]
                     StatusCheck[index] = true
                     push!(Cluster, index)
@@ -134,7 +135,7 @@ function _Main(
                         indexTemp = CartesianIndex(i, yIndex)
                         if !StatusCheck[indexTemp] && Status[indexTemp] == state
                             if rand() < pCluster
-                                push!(Indices, indexTemp)
+                                push!(CenterIndices, indexTemp)
                                 StatusCheck[indexTemp] = true
                                 push!(Cluster, indexTemp)
                             end
@@ -144,7 +145,7 @@ function _Main(
                         indexTemp = CartesianIndex(xIndex, j)
                         if !StatusCheck[indexTemp] && Status[indexTemp] == state
                             if rand() < pCluster
-                                push!(Indices, indexTemp)
+                                push!(CenterIndices, indexTemp)
                                 StatusCheck[indexTemp] = true
                                 push!(Cluster, indexTemp)
                             end
@@ -152,11 +153,13 @@ function _Main(
                     end
                 end
 
+                push!(LengthCluster, lastindex(Cluster))
                 for index in Cluster
                     Status[index] *= -1
                 end
 
                 σA = sum(Status)/n^2 |> abs # 求平均后绝对值
+                #=
                 pushfirst!(σASTemp, σA)
                 push!(Acorr, 0)
                 for j in eachindex(σASTemp)
@@ -166,11 +169,13 @@ function _Main(
                 if last(Acorr) |> iszero
                     break
                 end
+                =#
             end
 
             println("Temperature\t", T, "\tσAverage\t", σA)
             σAS[i] = σA    # 存储遍历数据
         end
+        println("\nThe longest Cluster's length is\t", sort(LengthCluster, rev = true)[1:5])
 
         # 绘制不同实验的图像
         plot!(
@@ -186,7 +191,7 @@ function _Main(
     savefig("sigmaAverage-nodes.png")
 
     solutionIndex = findfirst(iszero, σAS) # 找到第一个平均自旋降至0的温度
-    println("\n", "*"^10)
+    println("\n", "*"^20)
     println("Solution is:\t", TS[solutionIndex])    # 将解打印
     println()
 

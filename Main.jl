@@ -89,7 +89,7 @@ function _Main(
     timeScale::Int64 = 1000, 
     TMin::Int64 = 1,
     TMax::Int64 = 4,
-    TTick::Float64 = 0.05
+    TTick::Float64 = 0.01
 )
     TS = collect(TMin:TTick:TMax)    # 温度序列
     σAS = similar(TS)  # 存储温度序列对应平均自旋的数组
@@ -100,7 +100,8 @@ function _Main(
         n = 2^nPow  # 单方向格点数
         
         # 生成每次实验在不同温度下通用的初始状态
-        RawStatus::Array{Int64} = rand((-1, 1), (n, n))
+        # RawStatus::Array{Int64} = rand((-1, 1), (n, n))
+        RawStatus = ones(n, n)
         println("\nThe number of nodes is $(n)")
         println("*"^20)
         
@@ -180,7 +181,6 @@ function _Main(
         )
     end
     xlabel!("kT/J")     # x轴名称
-    xticks!(TS)         # x轴刻度  
     ylabel!("⟨σ⟩")       # y轴名称
     title!("σAverage-nodes")  # 图名
     savefig("sigmaAverage-nodes.png")
@@ -208,7 +208,6 @@ function _Main(
         label = "theoretical"
     )
     xlabel!("kT/J")     # x轴名称
-    xticks!(TS)         # x轴刻度  
     ylabel!("⟨σ⟩")       # y轴名称
     title!("σAverage")  # 图名
     savefig("sigmaAverage.png")

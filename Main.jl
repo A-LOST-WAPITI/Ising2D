@@ -85,16 +85,16 @@ end
     `TMax`是最大的温度
 """ ->
 function _Main(
-    nPowMax::Int64 = 5, 
+    nPowMax::Int64 = 6, 
     timeScale::Int64 = 1000, 
     TMin::Int64 = 1,
     TMax::Int64 = 4,
-    TTick::Float64 = 0.1
+    TTick::Float64 = 0.05
 )
     TS = collect(TMin:TTick:TMax)    # 温度序列
     σAS = similar(TS)  # 存储温度序列对应平均自旋的数组
 
-    plot(size = (1200, 800))
+    plot(size = (1600, 800))
     # 不同格点
     for nPow = 3:nPowMax
         n = 2^nPow  # 单方向格点数
@@ -105,7 +105,6 @@ function _Main(
         println("*"^20)
         
         # 对于给定的单方向格点数遍历各个不同的温度
-        LengthCluster = Array{Int64}([])
         for (i, T) in enumerate(TS)
             Status = RawStatus  # 赋初值
             σASTemp = Array{Float64}([])
@@ -115,17 +114,17 @@ function _Main(
 
             # 时间序列循环
             for time = 1:timeScale
+                index = CartesianIndex(rand(1:n), rand(1:n))
+                state = Status[index]
+
                 StatusCheck = falses(n, n)
-                Cluster = Array{CartesianIndex}([]) # 用于存储本次生成的cluster的格点位置的数组
-                CenterIndices = Array{CartesianIndex}(
-                    [CartesianIndex(rand(1:n), rand(1:n))]
-                )
+
+                CenterIndices = Array{CartesianIndex}([index])
+                Cluster = Array{CartesianIndex}([index]) # 用于存储本次生成的cluster的格点位置的数组
+                StatusCheck[index] = true
 
                 while lastindex(CenterIndices) > 0
                     index = popfirst!(CenterIndices)
-                    state = Status[index]
-                    StatusCheck[index] = true
-                    push!(Cluster, index)
 
                     xIndex = index[1]
                     yIndex = index[2]
@@ -136,8 +135,8 @@ function _Main(
                         if !StatusCheck[indexTemp] && Status[indexTemp] == state
                             if rand() < pCluster
                                 push!(CenterIndices, indexTemp)
-                                StatusCheck[indexTemp] = true
                                 push!(Cluster, indexTemp)
+                                StatusCheck[indexTemp] = true
                             end
                         end
                     end
@@ -146,20 +145,18 @@ function _Main(
                         if !StatusCheck[indexTemp] && Status[indexTemp] == state
                             if rand() < pCluster
                                 push!(CenterIndices, indexTemp)
-                                StatusCheck[indexTemp] = true
                                 push!(Cluster, indexTemp)
+                                StatusCheck[indexTemp] = true
                             end
                         end
                     end
                 end
 
-                push!(LengthCluster, lastindex(Cluster))
                 for index in Cluster
                     Status[index] *= -1
                 end
 
                 σA = sum(Status)/n^2 |> abs # 求平均后绝对值
-                #=
                 pushfirst!(σASTemp, σA)
                 push!(Acorr, 0)
                 for j in eachindex(σASTemp)
@@ -169,13 +166,11 @@ function _Main(
                 if last(Acorr) |> iszero
                     break
                 end
-                =#
             end
 
             println("Temperature\t", T, "\tσAverage\t", σA)
             σAS[i] = σA    # 存储遍历数据
         end
-        println("\nThe longest Cluster's length is\t", sort(LengthCluster, rev = true)[1:5])
 
         # 绘制不同实验的图像
         plot!(
@@ -197,7 +192,7 @@ function _Main(
 
     σAST = TS .|> (x -> _Findσ(x, TMax))    # 使用二分法得到的平均场近似理论解存于σAST中
 
-    plot(size = (1200, 800))
+    plot(size = (1600, 800))
     # 最多节点数值解绘图
     plot!(
         TS, 

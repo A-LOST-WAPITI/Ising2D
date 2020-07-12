@@ -85,16 +85,16 @@ end
     `TMax`是最大的温度
 """ ->
 function _Main(
-    nPowMax::Int64 = 5, 
+    nPowMax::Int64 = 6, 
     timeScale::Int64 = 1000, 
     TMin::Int64 = 1,
     TMax::Int64 = 4,
-    TTick::Float64 = 0.02
+    TTick::Float64 = 0.01
 )
     TS = collect(TMin:TTick:TMax)    # 温度序列
     σAS = similar(TS)  # 存储温度序列对应平均自旋的数组
 
-    plot(size = (1200, 800))
+    plot(size = (1600, 800))
     # 不同格点
     for nPow = 3:nPowMax
         n = 2^nPow  # 单方向格点数
@@ -103,7 +103,7 @@ function _Main(
         # RawStatus::Array{Int64} = rand((-1, 1), (n, n))
         RawStatus = ones(n, n)
         println("\nThe number of nodes is $(n)")
-        println("*"^5)
+        println("*"^20)
         
         # 对于给定的单方向格点数遍历各个不同的温度
         for (i, T) in enumerate(TS)
@@ -115,57 +115,46 @@ function _Main(
 
             # 时间序列循环
             for time = 1:timeScale
+                index = CartesianIndex(rand(1:n), rand(1:n))
+                state = Status[index]
+
                 StatusCheck = falses(n, n)
 
-                index = CartesianIndex(rand(1:n), rand(1:n))
-                Indices = Array{CartesianIndex}([index])
+                CenterIndices = Array{CartesianIndex}([index])
+                Cluster = Array{CartesianIndex}([index]) # 用于存储本次生成的cluster的格点位置的数组
                 StatusCheck[index] = true
 
-                # 如果仍有格点未被检验则进行cluster
-                while sum(StatusCheck) != n^2
-                    Cluster = Array{CartesianIndex}([]) # 用于存储本次生成的cluster的格点位置的数组
+                while lastindex(CenterIndices) > 0
+                    index = popfirst!(CenterIndices)
 
-                    while lastindex(Indices) > 0
-                        index = popfirst!(Indices)
-                        state = Status[index]
-                        push!(Cluster, index)
+                    xIndex = index[1]
+                    yIndex = index[2]
+                    XNei, YNei = _Nei(xIndex, yIndex, n)
 
-                        xIndex = index[1]
-                        yIndex = index[2]
-
-                        XNei, YNei = _Nei(xIndex, yIndex, n)
-
-                        for i in XNei
-                            indexTemp = CartesianIndex(i, yIndex)
-                            if !StatusCheck[indexTemp] && Status[indexTemp] == state
-                                if rand() < pCluster
-                                    push!(Indices, indexTemp)
-                                    StatusCheck[indexTemp] = true
-                                end
-                            end
-                        end
-                        for j in YNei
-                            indexTemp = CartesianIndex(xIndex, j)
-                            if !StatusCheck[indexTemp] && Status[indexTemp] == state
-                                if rand() < pCluster
-                                    push!(Indices, indexTemp)
-                                    StatusCheck[indexTemp] = true
-                                end
+                    for i in XNei
+                        indexTemp = CartesianIndex(i, yIndex)
+                        if !StatusCheck[indexTemp] && Status[indexTemp] == state
+                            if rand() < pCluster
+                                push!(CenterIndices, indexTemp)
+                                push!(Cluster, indexTemp)
+                                StatusCheck[indexTemp] = true
                             end
                         end
                     end
-
-                    if rand() < 0.5
-                        for index in Cluster
-                            Status[index] *= -1
+                    for j in YNei
+                        indexTemp = CartesianIndex(xIndex, j)
+                        if !StatusCheck[indexTemp] && Status[indexTemp] == state
+                            if rand() < pCluster
+                                push!(CenterIndices, indexTemp)
+                                push!(Cluster, indexTemp)
+                                StatusCheck[indexTemp] = true
+                            end
                         end
                     end
+                end
 
-                    nextIndex = findfirst(!, StatusCheck)
-                    if !isnothing(nextIndex)
-                        push!(Indices, nextIndex)
-                        StatusCheck[nextIndex] = true
-                    end
+                for index in Cluster
+                    Status[index] *= -1
                 end
 
                 σA = sum(Status)/n^2 |> abs # 求平均后绝对值
@@ -197,13 +186,13 @@ function _Main(
     savefig("sigmaAverage-nodes.png")
 
     solutionIndex = findfirst(iszero, σAS) # 找到第一个平均自旋降至0的温度
-    println("\n", "*"^10)
+    println("\n", "*"^20)
     println("Solution is:\t", TS[solutionIndex])    # 将解打印
     println()
 
     σAST = TS .|> (x -> _Findσ(x, TMax))    # 使用二分法得到的平均场近似理论解存于σAST中
 
-    plot(size = (1200, 800))
+    plot(size = (1600, 800))
     # 最多节点数值解绘图
     plot!(
         TS, 

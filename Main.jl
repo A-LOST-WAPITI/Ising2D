@@ -89,7 +89,7 @@ function _Main(
     timeScale::Int64 = 1000, 
     TMin::Int64 = 1,
     TMax::Int64 = 4,
-    TTick::Float64 = 0.1
+    TTick::Float64 = 0.02
 )
     TS = collect(TMin:TTick:TMax)    # 温度序列
     σAS = similar(TS)  # 存储温度序列对应平均自旋的数组
@@ -100,7 +100,8 @@ function _Main(
         n = 2^nPow  # 单方向格点数
         
         # 生成每次实验在不同温度下通用的初始状态
-        RawStatus::Array{Int64} = rand((-1, 1), (n, n))
+        # RawStatus::Array{Int64} = rand((-1, 1), (n, n))
+        RawStatus = ones(n, n)
         println("\nThe number of nodes is $(n)")
         println("*"^5)
         
@@ -110,14 +111,15 @@ function _Main(
             σASTemp = Array{Float64}([])
             Acorr = Array{Float64}([])
             σA::Float64 = 0
-            coin = 1 - exp(-(J₁ + J₂)/T)
+            pCluster = 1 - exp(-(J₁ + J₂)/T)
 
             # 时间序列循环
             for time = 1:timeScale
                 StatusCheck = falses(n, n)
-                Indices = Array{CartesianIndex}(
-                    [CartesianIndex(rand(1:n), rand(1:n))]
-                )
+
+                index = CartesianIndex(rand(1:n), rand(1:n))
+                Indices = Array{CartesianIndex}([index])
+                StatusCheck[index] = true
 
                 # 如果仍有格点未被检验则进行cluster
                 while sum(StatusCheck) != n^2
@@ -126,7 +128,6 @@ function _Main(
                     while lastindex(Indices) > 0
                         index = popfirst!(Indices)
                         state = Status[index]
-                        StatusCheck[index] = true
                         push!(Cluster, index)
 
                         xIndex = index[1]
@@ -137,20 +138,18 @@ function _Main(
                         for i in XNei
                             indexTemp = CartesianIndex(i, yIndex)
                             if !StatusCheck[indexTemp] && Status[indexTemp] == state
-                                if rand() < coin
+                                if rand() < pCluster
                                     push!(Indices, indexTemp)
                                     StatusCheck[indexTemp] = true
-                                    push!(Cluster, indexTemp)
                                 end
                             end
                         end
                         for j in YNei
                             indexTemp = CartesianIndex(xIndex, j)
                             if !StatusCheck[indexTemp] && Status[indexTemp] == state
-                                if rand() < coin
+                                if rand() < pCluster
                                     push!(Indices, indexTemp)
                                     StatusCheck[indexTemp] = true
-                                    push!(Cluster, indexTemp)
                                 end
                             end
                         end
@@ -165,6 +164,7 @@ function _Main(
                     nextIndex = findfirst(!, StatusCheck)
                     if !isnothing(nextIndex)
                         push!(Indices, nextIndex)
+                        StatusCheck[nextIndex] = true
                     end
                 end
 
@@ -192,7 +192,6 @@ function _Main(
         )
     end
     xlabel!("kT/J")     # x轴名称
-    xticks!(TS)         # x轴刻度  
     ylabel!("⟨σ⟩")       # y轴名称
     title!("σAverage-nodes")  # 图名
     savefig("sigmaAverage-nodes.png")
@@ -220,7 +219,6 @@ function _Main(
         label = "theoretical"
     )
     xlabel!("kT/J")     # x轴名称
-    xticks!(TS)         # x轴刻度  
     ylabel!("⟨σ⟩")       # y轴名称
     title!("σAverage")  # 图名
     savefig("sigmaAverage.png")

@@ -73,9 +73,14 @@ end
 
 
 function _MC!(Status::Array{Int64}, n::Int64,  pCluster::Float64, steps::Int64, measure::Bool)
-    σASTemp = zeros(steps + 1)
-    Acorr = zeros(steps + 1)
+    if !measure
+        σASTemp = zeros(steps + 1)
+        Acorr = zeros(steps + 1)
+    else
+        σASTemp = zeros(steps)
+    end
     σA::Float64 = 0
+    mse::Float64 = 0
 
     # 时间序列循环
     for time = 1:steps
@@ -137,13 +142,18 @@ function _MC!(Status::Array{Int64}, n::Int64,  pCluster::Float64, steps::Int64, 
                 break
             end
         else
-            σA += sum(Status)/n^2 |> abs # 求平均后绝对值
+            temp = sum(Status)/n^2 |> abs # 求平均后绝对值
+            σASTemp[time] = temp
+            σA += temp
         end
     end
 
-    σA /= steps
+    if measure
+        σA /= steps
+        mse = sum(@. (σASTemp - σA)^2)/steps
+    end
 
-    return σA
+    return σA, mse
 end
 
 
@@ -169,6 +179,7 @@ function _Main(
 )
     TS = collect(TMin:TTick:TMax)    # 温度序列
     σAS = similar(TS)  # 存储温度序列对应平均自旋的数组
+    MSE = similar(TS)
 
     plot(size = (1600, 800))
     # 不同格点
@@ -189,17 +200,19 @@ function _Main(
 
             # 时间序列循环
             _MC!(Status, n, pCluster, timeScale, false)
-            σA = _MC!(Status, n, pCluster, measureScale, true)
+            σA, mse = _MC!(Status, n, pCluster, measureScale, true)
 
             println("Temperature\t", T, "\tσAverage\t", σA)
             σAS[i] = σA    # 存储遍历数据
+            MSE[i] = mse
         end
 
         # 绘制不同实验的图像
         plot!(
             TS, 
             σAS, 
-            label = "$(n)-nodes"
+            label = "$(n)-nodes", 
+            yerror = MSE
         )
     end
     xlabel!("kT/J")     # x轴名称

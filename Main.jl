@@ -84,12 +84,14 @@ function _MC!(Status::Array{Int64}, n::Int64,  pCluster::Float64, steps::Int64, 
 
         StatusCheck = falses(n, n)
 
-        CenterIndices = Array{CartesianIndex}([index])
-        Cluster = Array{CartesianIndex}([index]) # 用于存储本次生成的cluster的格点位置的数组
+        CenterIndices = Channel{CartesianIndex{2}}(n^2)
+        put!(CenterIndices, index)
+        Cluster = Channel{CartesianIndex{2}}(n^2) # 用于存储本次生成的cluster的格点位置的数组
+        put!(Cluster, index)
         StatusCheck[index] = true
 
-        while lastindex(CenterIndices) > 0
-            index = popfirst!(CenterIndices)
+        while isready(CenterIndices)
+            index = take!(CenterIndices)
 
             xIndex = index[1]
             yIndex = index[2]
@@ -99,8 +101,8 @@ function _MC!(Status::Array{Int64}, n::Int64,  pCluster::Float64, steps::Int64, 
                 indexTemp = CartesianIndex(i, yIndex)
                 if !StatusCheck[indexTemp] && Status[indexTemp] == state
                     if rand() < pCluster
-                        push!(CenterIndices, indexTemp)
-                        push!(Cluster, indexTemp)
+                        put!(CenterIndices, indexTemp)
+                        put!(Cluster, indexTemp)
                         StatusCheck[indexTemp] = true
                     end
                 end
@@ -109,13 +111,15 @@ function _MC!(Status::Array{Int64}, n::Int64,  pCluster::Float64, steps::Int64, 
                 indexTemp = CartesianIndex(xIndex, j)
                 if !StatusCheck[indexTemp] && Status[indexTemp] == state
                     if rand() < pCluster
-                        push!(CenterIndices, indexTemp)
-                        push!(Cluster, indexTemp)
+                        put!(CenterIndices, indexTemp)
+                        put!(Cluster, indexTemp)
                         StatusCheck[indexTemp] = true
                     end
                 end
             end
         end
+        close(CenterIndices)
+        close(Cluster)
 
         for index in Cluster
             Status[index] *= -1
@@ -185,7 +189,7 @@ function _Main(
 
             # 时间序列循环
             _MC!(Status, n, pCluster, timeScale, false)
-            σA = _MC!(Status, n, pCluster, timeScale, true)
+            σA = _MC!(Status, n, pCluster, measureScale, true)
 
             println("Temperature\t", T, "\tσAverage\t", σA)
             σAS[i] = σA    # 存储遍历数据

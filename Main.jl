@@ -22,56 +22,6 @@ function _Nei(xIndex::Int64, yIndex::Int64, n::Int64)
 end
 
 
-@doc md"""
-    _TheoryF(T::Float64, σ::Float64)
-
-    用于确定温度为`T`时平均自旋`σ`的平均场近似理论解
-""" ->
-function _TheoryF(T::Float64, σ::Float64)
-    tanh((2J₁ + 2J₂)σ/T) - σ
-end
-
-
-@doc md"""
-    _Findσ(
-        T::Float64, 
-        TMax::Int64, 
-        iterMax::Int64 = 1000, 
-        eps::Float64 = 1e-8
-    )
-
-    使用二分法确定$_TheoryF = 0$的解来确定
-    平均场近似下$\sigma$的值，
-    其中`T`为给定温度，
-    `TMax`为求解的最大温度，
-    `iterMax`为迭代的最大步数，
-    `eps`为允许误差最大值
-""" ->
-function _Findσ(
-    T::Float64, 
-    TMax::Int64, 
-    iterMax::Int64 = 1000, 
-    eps::Float64 = 1e-8
-)
-    upper = Float64(TMax)
-    lower = 0.0
-    mid = (lower + upper)/2
-
-    for iter = 1:iterMax
-        temp = _TheoryF(T, mid)
-        if abs(temp) < eps
-            return mid
-        else
-            temp > 0 && (lower = mid; true)
-            temp < 0 && (upper = mid; true)
-            mid = (lower + upper)/2
-        end
-    end
-
-    return mid
-end
-
-
 function _MC!(Status::Array{Int64}, n::Int64,  pCluster::Float64, steps::Int64, measure::Bool)
     if !measure
         σASTemp = zeros(steps + 1)
@@ -226,28 +176,6 @@ function _Main(
     println("Solution is:\t", TS[solutionIndex])    # 将解打印
     println()
     =#
-
-    σAST = TS .|> (x -> _Findσ(x, TMax))    # 使用二分法得到的平均场近似理论解存于σAST中
-
-    plot(size = (1600, 800))
-    # 最多节点数值解绘图
-    plot!(
-        TS, 
-        σAS .|> abs, 
-        yerror = σAS .- σAST,
-        markerstrokecolor = :black,
-        label = "computional"
-    )
-    # 理论解绘图
-    plot!(
-        TS, 
-        σAST,
-        label = "theoretical"
-    )
-    xlabel!("kT/J")     # x轴名称
-    ylabel!("⟨σ⟩")       # y轴名称
-    title!("σAverage")  # 图名
-    savefig("sigmaAverage.png")
 
     "Everything goes fine."
 end

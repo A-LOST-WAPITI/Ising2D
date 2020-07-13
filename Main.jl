@@ -1,6 +1,7 @@
 using Markdown      # 引入Markdown支持
 using Plots         # 引入绘图包
-using LaTeXStrings  # 引入LaTeX支持
+using Printf
+using Flux
 
 
 const J₁ = 1    # x方向相邻的相互作用
@@ -28,9 +29,12 @@ function _MC!(Status::Array{Int64}, n::Int64,  pCluster::Float64, steps::Int64, 
         Acorr = zeros(steps + 1)
     else
         σASTemp = zeros(steps)
+        Σ2ASTemp = zeros(steps)
     end
     σA::Float64 = 0
-    mse::Float64 = 0
+    Σ2A::Float64 = 0
+    σMse::Float64 = 0
+    Σ2Mse::Float64 = 0
 
     # 时间序列循环
     for time = 1:steps
@@ -92,18 +96,24 @@ function _MC!(Status::Array{Int64}, n::Int64,  pCluster::Float64, steps::Int64, 
                 break
             end
         else
-            temp = sum(Status)/n^2 |> abs # 求平均后绝对值
-            σASTemp[time] = temp
+            temp = sum(Status) |> abs   # 计算总自旋
+            Σ2A += temp^2
+            Σ2ASTemp[time] = Σ2A
+            temp /= n^2
             σA += temp
+            σASTemp[time] = temp
         end
     end
 
     if measure
         σA /= steps
-        mse = sum(@. (σASTemp - σA)^2)/steps
+        Σ2A /= steps
+        
+        σMse = sum(@. (σASTemp - σA)^2)/steps
+        Σ2Mse = sum(@. (Σ2ASTemp - Σ2A)^2)/steps
     end
 
-    return σA, mse
+    return σA, σMse, Σ2A, Σ2Mse
 end
 
 
@@ -122,16 +132,31 @@ end
 function _Main(
     nPowMax::Int64 = 6, 
     timeScale::Int64 = 20000, 
-    measureScale::Int64 = 2000, 
-    TMin::Int64 = 1,
-    TMax::Int64 = 4,
-    TTick::Float64 = 0.05
+    measureScale::Int64 = 20000, 
+    TMin::Float64 = 1.5,
+    TMax::Float64 = 3.5,
+    nTicks::Int64 = 50, 
+    eps::Float64 = 1e-4
 )
-    TS = collect(TMin:TTick:TMax)    # 温度序列
+    TS = LinRange(TMin, TMax, nTicks) |> collect    # 温度序列
     σAS = similar(TS)  # 存储温度序列对应平均自旋的数组
-    MSE = similar(TS)
+    σMSE = similar(TS)
+    Σ2AS = similar(TS)
+    Σ2MSE = similar(TS)
+    χAS = zeros(measureScale)
 
-    plot(size = (1600, 800))
+    σPlot = plot(
+        size = (1600, 800), 
+        title = "σAverage-nodes",
+        xlabel = "kT/J",
+        ylabel = "σ Average"
+    )
+    χPlot = plot(
+        size = (1600, 800),
+        title = "χAverage-nodes",
+        xlabel = "kT/J",
+        ylabel = "χ Average"
+    )
     # 不同格点
     for nPow = 3:nPowMax
         n = 2^nPow  # 单方向格点数
@@ -143,39 +168,44 @@ function _Main(
         println("*"^20)
         
         # 对于给定的单方向格点数遍历各个不同的温度
-        for (i, T) in enumerate(TS)
-            Status = RawStatus  # 赋初值
+        Threads.@threads for (i, T) in enumerate(TS) |> collect
+            Status = deepcopy(RawStatus)  # 赋初值
             
             pCluster = 1 - exp(-(J₁ + J₂)/T)
 
             # 时间序列循环
             _MC!(Status, n, pCluster, timeScale, false)
-            σA, mse = _MC!(Status, n, pCluster, measureScale, true)
+            σA, σMse, Σ2A, Σ2Mse = _MC!(Status, n, pCluster, measureScale, true)
 
-            println("Temperature\t", T, "\tσAverage\t", σA)
+            @printf(
+                "Temperature\t %.5f \tσAverage\t %10.f \tSigma^2Average\t %.3f \n",
+                T, σA, Σ2A
+            )
             σAS[i] = σA    # 存储遍历数据
-            MSE[i] = mse
+            σMSE[i] = σMse
+            Σ2AS[i] = Σ2A
+            Σ2MSE[i] = Σ2Mse
         end
+
+        χAS = @. (Σ2AS - (σAS * n^2)^2)/(n^2 * TS)
 
         # 绘制不同实验的图像
         plot!(
+            σPlot,
             TS, 
             σAS, 
             label = "$(n)-nodes", 
-            yerror = MSE
+            yerror = σMSE
+        )
+        plot!(
+            χPlot, 
+            TS,
+            χAS,
+            label = "$(n)-nodes"
         )
     end
-    xlabel!("kT/J")     # x轴名称
-    ylabel!("⟨σ⟩")       # y轴名称
-    title!("σAverage-nodes")  # 图名
-    savefig("sigmaAverage-nodes.png")
-
-    #=
-    solutionIndex = findfirst(iszero, σAS) # 找到第一个平均自旋降至0的温度
-    println("\n", "*"^20)
-    println("Solution is:\t", TS[solutionIndex])    # 将解打印
-    println()
-    =#
+    savefig(σPlot, "sigmaAverage-nodes.png")
+    savefig(χPlot, "chiAverage-nodes.png")
 
     "Everything goes fine."
 end

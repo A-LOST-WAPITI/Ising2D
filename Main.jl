@@ -1,7 +1,6 @@
 using Markdown      # 引入Markdown支持
 using Plots         # 引入绘图包
 using Printf
-using Flux
 
 
 const J₁ = 1    # x方向相邻的相互作用
@@ -130,13 +129,13 @@ end
     `TMax`是最大的温度
 """ ->
 function _Main(
-    nPowMax::Int64 = 6, 
-    timeScale::Int64 = 20000, 
-    measureScale::Int64 = 20000, 
+    nPowMax::Int64 = 8, 
+    timeScale::Int64 = 10000, 
+    measureScale::Int64 = 50000, 
     TMin::Float64 = 1.5,
     TMax::Float64 = 3.5,
     nTicks::Int64 = 50, 
-    eps::Float64 = 1e-4
+    eps::Float64 = 1e-3
 )
     TS = LinRange(TMin, TMax, nTicks) |> collect    # 温度序列
     σAS = similar(TS)  # 存储温度序列对应平均自旋的数组
@@ -195,17 +194,25 @@ function _Main(
             TS, 
             σAS, 
             label = "$(n)-nodes", 
-            yerror = σMSE
+            yerror = σMSE,
+            markershape = :x
         )
         plot!(
             χPlot, 
             TS,
             χAS,
-            label = "$(n)-nodes"
+            label = "$(n)-nodes",
+            markershape = :x
         )
     end
     savefig(σPlot, "sigmaAverage-nodes.png")
     savefig(χPlot, "chiAverage-nodes.png")
+
+
+    tempT = TS[findmax(χAS)[2]]
+    println("\n", "*"^20)
+    println("Solution is:\t", tempT)    # 将解打印
+    println()
 
     "Everything goes fine."
 end

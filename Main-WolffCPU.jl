@@ -117,7 +117,7 @@ function _MC!(
             σASTemp[2:time + 1] .= σASTemp[1:time]
             σASTemp[1] = σA
             # 计算Acorr用于提前结束已稳定的状态
-            for j = 1:time + 1
+            for j = 1:time
                 Acorr[j] += σA * σASTemp[j]
             end
             

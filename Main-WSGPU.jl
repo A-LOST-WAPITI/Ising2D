@@ -60,6 +60,11 @@ function _Flip!(Flags, Probability, Status)
 end
 
 
+function _Measure(Status, time, )
+    
+end
+
+
 @doc md"""
     _Main(
         nPowMax::Int64 = 8, 
@@ -107,7 +112,7 @@ function _Main(
         ylabel = "χ Average"
     )
     # 不同格点
-    for nPow = 3:nPowMax
+    for nPow = 7:nPowMax
         n = 2^nPow  # 单方向格点数
         Forward = [2:n |> collect; 1]
         thread = min(32, n)
@@ -118,8 +123,10 @@ function _Main(
         println("\nThe number of nodes is $(n)")
         println("*"^20)
         
-        Flags = CUDA.zeros(Int32, (n, n))
-        NewFlags = similar(Flags)
+        InitFlags = CUDA.zeros(Int32, (n, n))
+        @cuda blocks = blocks threads = threads _Init!(n, InitFlags)
+        Flags = similar(InitFlags)
+        NewFlags = similar(InitFlags)
         # 对于给定的单方向格点数并行遍历各个不同的温度
         for (i, T) in enumerate(TS)
             Status = CUDA.ones(Int32, (n, n)) # 赋初值
@@ -128,10 +135,8 @@ function _Main(
             pCluster = 1 - exp(-(J₁ + J₂)/T)
 
             # 时间序列循环
-            σASTemp = zeros(timeScale + 1)
-            Acorr = zeros(timeScale + 1)
             for time = 1:timeScale
-                @cuda blocks = blocks threads = threads _Init!(n, Flags)
+                Flags .= InitFlags
                 Probability = CUDA.rand(Float32, n^2)
 
                 # 确定当前格点是否与右侧最近临格点相连
@@ -148,24 +153,13 @@ function _Main(
                     Flags .= NewFlags
                 end
                 @cuda blocks = blocks threads = threads _Flip!(Flags, Probability, Status)
-
-                σA = sum(Status)/n^2 |> abs # 求平均后绝对值
-                σASTemp[2:time + 1] .= σASTemp[1:time]
-                σASTemp[1] = σA
-                # 计算Acorr用于提前结束已稳定的状态
-                for j = 1:time
-                    Acorr[j] += σA * σASTemp[j]
-                end
-                
-                if Acorr[time] |> iszero
-                    break
-                end
             end
 
+            println("Im here")
             σASTemp = zeros(Float32, measureScale)
             Σ2ASTemp = zeros(Float32, measureScale)
             for time = 1:measureScale
-                @cuda blocks = blocks threads = threads _Init!(n, Flags)
+                Flags .= InitFlags
                 Probability = CUDA.rand(Float32, n^2)
 
                 # 确定当前格点是否与右侧最近临格点相连
@@ -173,9 +167,12 @@ function _Main(
                 # 确定当前格点是否与下方最近临格点相连
                 Below = ((Status .== Status[Forward, :]) .& (CUDA.rand(Float32, (n, n)) .< pCluster))
 
-                for i = 1:n
+                for i = 1:n^2
                     @cuda blocks = blocks threads = threads _Cluster!(n, Flags, Right, Below, NewFlags)
-                
+
+                    if Flags == NewFlags
+                        break
+                    end
                     Flags .= NewFlags
                 end
                 @cuda blocks = blocks threads = threads _Flip!(Flags, Probability, Status)
@@ -184,7 +181,6 @@ function _Main(
                 # readline(stdin)
 
                 Σ = Status |> sum |> abs
-                # println(Σ)
                 σ = Σ/n^2 
                 Σ2 = Σ^2
 

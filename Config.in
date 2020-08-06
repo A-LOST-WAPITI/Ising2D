@@ -1,0 +1,10 @@
+# 使用算法
+Metropolis,Wolff,WS
+# 单方向长度最大值与最小值的指数
+7,2
+# 温度
+2.269,3.0
+# bins binSteps
+10,10000
+# timeNum tfreq
+250,1

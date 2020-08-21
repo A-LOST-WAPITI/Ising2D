@@ -155,7 +155,6 @@ function _Main(
                 @cuda blocks = blocks threads = threads _Flip!(Flags, Probability, Status)
             end
 
-            println("Im here")
             σASTemp = zeros(Float32, measureScale)
             Σ2ASTemp = zeros(Float32, measureScale)
             for time = 1:measureScale

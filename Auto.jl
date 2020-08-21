@@ -67,8 +67,7 @@ function _Main()
 
         @eval _MC! = $fn
 
-        # LPows = lPowMin:lPowMax |> collect
-        LPows = [6]
+        LPows = lPowMin:lPowMax |> collect
         TPlot = plot(
             size = (1600, 800),
             xlabel = L"L",
